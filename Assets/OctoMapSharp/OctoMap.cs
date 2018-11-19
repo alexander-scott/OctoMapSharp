@@ -3,6 +3,45 @@ using UnityEngine;
 
 namespace OctoMapSharp
 {
+    public class OctoMapCompact
+    {
+        /// <summary>
+        /// The origin position of the OctoMap. Individual node positions are derived from this root position.
+        /// </summary>
+        public Vector3 RootNodePosition { get; set; }
+
+        /// <summary>
+        /// The size of the root node.
+        /// </summary>
+        public float RootNodeSize { get; set; }
+
+        /// <summary>
+        /// The minimum size a node can get when traversing through the OctoMap.
+        /// </summary>
+        public float MinimumNodeSize { get; set; }
+
+        /// <summary>
+        /// The compact BitStream containing all the parent-child relationships in the OctoMap.
+        /// </summary>
+        public byte[] BitStream { get; set; }
+
+        /// <summary>
+        /// Constructor for the compact OctoMap. Sets the public properties of the class.
+        /// </summary>
+        /// <param name="rootNodePosition">The position of the root node</param>
+        /// <param name="rootNodeSize">The size of the root node</param>
+        /// <param name="minimumNodeSize">The minimum node size within the octomap</param>
+        /// <param name="bitStream">The compact bitstream</param>
+        public OctoMapCompact(Vector3 rootNodePosition, float rootNodeSize, float minimumNodeSize,
+            byte[] bitStream)
+        {
+            RootNodePosition = rootNodePosition;
+            RootNodeSize = rootNodeSize;
+            MinimumNodeSize = minimumNodeSize;
+            BitStream = bitStream;
+        }
+    }
+
     /// <summary>
     /// The publicly accessible octomap node data structure containing the position and size of a node
     /// </summary>
@@ -11,12 +50,12 @@ namespace OctoMapSharp
         /// <summary>
         /// The position in 3D space of this node
         /// </summary>
-        public Vector3 Position;
+        public Vector3 Position { get; set; }
 
         /// <summary>
         /// The size of all the sides of this nodes
         /// </summary>
-        public float Size;
+        public float Size { get; set; }
 
         /// <summary>
         /// Basic constructor that initializes the position and size of the data structure
@@ -111,23 +150,19 @@ namespace OctoMapSharp
         }
 
         /// <summary>
-        /// Initialise an OctoMap from a compact bitstream.
+        /// Initialize an OctoMap from a compact instance.
         /// </summary>
-        /// <param name="startingRootNodePosition">The starting position of the root node of the OctoMap.</param>
-        /// <param name="startingRootNodeSize">The starting size of the root node of the OctoMap.</param>
-        /// <param name="minimumNodeSize">The minimum size of a node.</param>
-        /// <param name="octomapBitstream">The compact bitstream containing the OctoMap parent-child relationships.</param>
-        public OctoMap(Vector3 startingRootNodePosition, float startingRootNodeSize, float minimumNodeSize,
-            byte[] octomapBitstream)
+        /// <param name="octoMapCompact">The compact instance that the OctoMap will be created from.</param>
+        public OctoMap(OctoMapCompact octoMapCompact)
         {
             _nodes = new Dictionary<uint, OctoMapNode>();
             _nodeChildren = new Dictionary<uint, uint[]>();
 
-            _rootNodePosition = startingRootNodePosition;
-            _rootNodeSize = startingRootNodeSize;
-            _minimumNodeSize = minimumNodeSize;
+            _rootNodePosition = octoMapCompact.RootNodePosition;
+            _rootNodeSize = octoMapCompact.RootNodeSize;
+            _minimumNodeSize = octoMapCompact.MinimumNodeSize;
 
-            BitStream bitStream = new BitStream(octomapBitstream);
+            BitStream bitStream = new BitStream(octoMapCompact.BitStream);
 
             OctoMapNode rootNode = new OctoMapNode();
             _rootNodeId = _nodeHighestIndex++;
@@ -142,7 +177,7 @@ namespace OctoMapSharp
         /// Converts the OctoMap in memory to a compact bitstream data structure.
         /// </summary>
         /// <returns>The compact bitstream.</returns>
-        public BitStream ConvertToBitStream()
+        public OctoMapCompact ConvertToOctoMapCompact()
         {
             // Number of bytes will be number of child node arrays multiplied by 2
             // (each item in the array is a node with children and each node takes up 2 bytes)
@@ -150,7 +185,7 @@ namespace OctoMapSharp
 
             BitStream bitStream = new BitStream(new byte[streamLength]);
             ConvertToBitStreamRecursive(bitStream, _rootNodeId);
-            return bitStream;
+            return new OctoMapCompact(_rootNodePosition, _rootNodeSize, _minimumNodeSize, bitStream.GetStreamData());
         }
 
         /// <summary>

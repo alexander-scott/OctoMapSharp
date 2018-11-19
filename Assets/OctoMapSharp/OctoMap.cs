@@ -172,12 +172,12 @@ namespace OctoMapSharp
                         bitStream.WriteBit(1);
                         bitStream.WriteBit(1);
                     }
-                    else if (childNode.Occupied <= -1) // FREE
+                    else if (CheckNodeFree(childNode)) // FREE
                     {
                         bitStream.WriteBit(1);
                         bitStream.WriteBit(0);
                     }
-                    else if (childNode.Occupied >= 1) // OCCUPIED
+                    else if (CheckNodeOccupied(childNode)) // OCCUPIED
                     {
                         bitStream.WriteBit(0);
                         bitStream.WriteBit(1);
@@ -237,14 +237,12 @@ namespace OctoMapSharp
                 else if (firstBit == 0 && secondBit == 1) // OCCUPIED
                 {
                     childNode = _nodes[childIdArray[i]];
-                    childNode.Occupied = 1;
-                    _nodes[childIdArray[i]] = childNode;
+                    _nodes[childIdArray[i]] = IncreaseNodeOccupation(childNode);
                 }
                 else if (firstBit == 1 && secondBit == 0) // FREE
                 {
                     childNode = _nodes[childIdArray[i]];
-                    childNode.Occupied = -1;
-                    _nodes[childIdArray[i]] = childNode;
+                    _nodes[childIdArray[i]] = DecreaseNodeOccupation(childNode);
                 }
 
                 // else UNKNOWN
@@ -292,7 +290,7 @@ namespace OctoMapSharp
 
             // If the ray intersects the current node, check if the current node is occupied
             OctoMapNode currentNode = _nodes[currentNodeId];
-            if (currentNode.Occupied >= 1)
+            if (CheckNodeOccupied(currentNode))
             {
                 return currentNodeCentre;
             }
@@ -320,7 +318,7 @@ namespace OctoMapSharp
 
         #endregion
 
-        #region Add point to the Octomap
+        #region Contribute To The Octomap
 
         /// <summary>
         /// Adds a point to the OctoMap which will mark a specific node as occupied.
@@ -367,8 +365,7 @@ namespace OctoMapSharp
             // If we're at the deepest level possible, this current node becomes a leaf node.
             if (currentNodeSize < _minimumNodeSize)
             {
-                node.Occupied = 1;
-                _nodes[currentNodeId] = node;
+                _nodes[currentNodeId] = IncreaseNodeOccupation(node);
                 return;
             }
 
@@ -406,7 +403,7 @@ namespace OctoMapSharp
                     return;
                 }
 
-                bool occupancy = child.Occupied >= 1;
+                bool occupancy = CheckNodeOccupied(child);
 
                 if (i == 0)
                 {
@@ -451,14 +448,7 @@ namespace OctoMapSharp
             // Set the current nodes occupancy state to that of its children
             OctoMapNode currentNode = _nodes[currentNodeId];
             currentNode.ChildArrayId = null;
-            if (childrenOccupancy)
-            {
-                currentNode.Occupied = 1;
-            }
-            else
-            {
-                currentNode.Occupied = -1;
-            }
+            currentNode = childrenOccupancy ? IncreaseNodeOccupation(currentNode) : DecreaseNodeOccupation(currentNode);
 
             _nodes[currentNodeId] = currentNode;
         }
@@ -497,8 +487,7 @@ namespace OctoMapSharp
                 }
 
                 // Mark this leaf node as free
-                currentNode.Occupied = -1;
-                _nodes[currentNodeId] = currentNode;
+                _nodes[currentNodeId] = DecreaseNodeOccupation(currentNode);
                 return;
             }
 
@@ -526,7 +515,7 @@ namespace OctoMapSharp
 
         #endregion
 
-        #region Return nodes
+        #region Return Nodes
 
         /// <summary>
         /// Returns a list of the octomap leaf nodes with each node having a position and size
@@ -550,7 +539,7 @@ namespace OctoMapSharp
             uint currentNodeId)
         {
             OctoMapNode currentNode = _nodes[currentNodeId];
-            if (currentNode.Occupied >= 1)
+            if (CheckNodeOccupied(currentNode))
             {
                 nodes.Add(new OctoMapNodeRaw(currentNodeCentre, currentNodeSize));
             }
@@ -569,7 +558,53 @@ namespace OctoMapSharp
 
         #endregion
 
-        #region Helper functions
+        #region Node Evaluation
+
+        /// <summary>
+        /// Sets the occupied state of a node to 1. Can be extended further.
+        /// </summary>
+        /// <param name="octoMapNode">The node to set the occupied state on</param>
+        /// <returns>The same node but with the occupied state changed</returns>
+        private static OctoMapNode IncreaseNodeOccupation(OctoMapNode octoMapNode)
+        {
+            octoMapNode.Occupied = 1;
+            return octoMapNode;
+        }
+
+        /// <summary>
+        /// Sets the occupied state of a node to -1. Can be extended further.
+        /// </summary>
+        /// <param name="octoMapNode">The node to set the occupied state on</param>
+        /// <returns>The same node but with the occupied state changed</returns>
+        private static OctoMapNode DecreaseNodeOccupation(OctoMapNode octoMapNode)
+        {
+            octoMapNode.Occupied = -1;
+            return octoMapNode;
+        }
+
+        /// <summary>
+        /// Returns true or false depending on whether a specific node is occupied. Can be extended further.
+        /// </summary>
+        /// <param name="octoMapNode">The node that will be checked</param>
+        /// <returns>True or false depending on whether a specific node is occupied.</returns>
+        private static bool CheckNodeOccupied(OctoMapNode octoMapNode)
+        {
+            return octoMapNode.Occupied >= 1;
+        }
+
+        /// <summary>
+        /// Returns true or false depending on whether a specific node is not occupied. Can be extended further.
+        /// </summary>
+        /// <param name="octoMapNode">The node that will be checked</param>
+        /// <returns>True or false depending on whether a specific node is not occupied.</returns>
+        private static bool CheckNodeFree(OctoMapNode octoMapNode)
+        {
+            return octoMapNode.Occupied <= -1;
+        }
+
+        #endregion
+
+        #region Helper Functions
 
         /// <summary>
         /// Expand the root node to encompass any additional added points by specifying the direction that it needs

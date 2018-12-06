@@ -3,6 +3,29 @@ using UnityEngine;
 
 namespace OctoMapSharp
 {
+    public class OctoMapRaw
+    {
+        /// <summary>
+        /// An array containing the centre position of every occupied node in the OctoMap
+        /// </summary>
+        public Vector3[] Positions { get; }
+        /// <summary>
+        /// An array containing the size of every occupied node in the OctoMap
+        /// </summary>
+        public float[] Sizes { get; }
+
+        /// <summary>
+        /// Constructor for the OctoMapRaw. Sets the public properties of the instance.
+        /// </summary>
+        /// <param name="positions">The array of node positions</param>
+        /// <param name="sizes">The array of node sizes</param>
+        public OctoMapRaw(Vector3[] positions, float[] sizes)
+        {
+            Positions = positions;
+            Sizes = sizes;
+        }
+    }
+
     public class OctoMapCompact
     {
         /// <summary>
@@ -41,34 +64,7 @@ namespace OctoMapSharp
             BitStream = bitStream;
         }
     }
-
-    /// <summary>
-    /// The publicly accessible octomap node data structure containing the position and size of a node
-    /// </summary>
-    public struct OctoMapNodeRaw
-    {
-        /// <summary>
-        /// The position in 3D space of this node
-        /// </summary>
-        public Vector3 Position { get; set; }
-
-        /// <summary>
-        /// The size of all the sides of this nodes
-        /// </summary>
-        public float Size { get; set; }
-
-        /// <summary>
-        /// Basic constructor that initializes the position and size of the data structure
-        /// </summary>
-        /// <param name="position">The value to initialize the nodes position with</param>
-        /// <param name="size">The value to initialize the nodes size with</param>
-        public OctoMapNodeRaw(Vector3 position, float size)
-        {
-            Position = position;
-            Size = size;
-        }
-    }
-
+    
     public class OctoMap
     {
         /// <summary>
@@ -550,33 +546,37 @@ namespace OctoMapSharp
 
         #endregion
 
-        #region Return Nodes
+        #region Get Nodes
 
         /// <summary>
         /// Returns a list of the octomap leaf nodes with each node having a position and size
         /// </summary>
         /// <returns>The list of octomap nodes</returns>
-        public List<OctoMapNodeRaw> GetOctoMapNodes()
+        public OctoMapRaw GetOctoMapNodes()
         {
-            List<OctoMapNodeRaw> nodes = new List<OctoMapNodeRaw>();
-            GatherOctoMapNodes(nodes, _rootNodeSize, _rootNodePosition, _rootNodeId);
-            return nodes;
+            List<Vector3> positions = new List<Vector3>();
+            List<float> sizes = new List<float>();
+            GatherOctoMapNodes(positions, sizes, _rootNodeSize, _rootNodePosition, _rootNodeId);
+            return new OctoMapRaw(positions.ToArray(), sizes.ToArray());
         }
 
         /// <summary>
         /// Recursively traverses though the octomap in order to find leaf nodes and then adds them to a list
         /// </summary>
-        /// <param name="nodes">The list of nodes</param>
+        /// <param name="positions">The list of node of node centre positions</param>
+        /// <param name="sizes">The list of node sizes</param>
         /// <param name="currentNodeSize">The node size the current recursive traversal is on.</param>
         /// <param name="currentNodeCentre">The node centre the current recursive traversal is on.</param>
         /// <param name="currentNodeId">The node ID the current recursive traversal is on.</param>
-        private void GatherOctoMapNodes(List<OctoMapNodeRaw> nodes, float currentNodeSize, Vector3 currentNodeCentre,
+        private void GatherOctoMapNodes(List<Vector3> positions, List<float> sizes, float currentNodeSize,
+            Vector3 currentNodeCentre,
             uint currentNodeId)
         {
             OctoMapNode currentNode = _nodes[currentNodeId];
             if (CheckNodeOccupied(currentNode))
             {
-                nodes.Add(new OctoMapNodeRaw(currentNodeCentre, currentNodeSize));
+                positions.Add(currentNodeCentre);
+                sizes.Add(currentNodeSize);
             }
 
             if (currentNode.ChildArrayId != null)
@@ -586,7 +586,7 @@ namespace OctoMapSharp
                     uint childId = _nodeChildren[currentNode.ChildArrayId.Value][i];
                     float newNodeSize = currentNodeSize / 2;
                     Vector3 newNodeCentre = GetBestFitChildNodeCentre(i, newNodeSize, currentNodeCentre);
-                    GatherOctoMapNodes(nodes, newNodeSize, newNodeCentre, childId);
+                    GatherOctoMapNodes(positions, sizes, newNodeSize, newNodeCentre, childId);
                 }
             }
         }

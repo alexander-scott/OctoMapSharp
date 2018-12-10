@@ -29,6 +29,11 @@ namespace OctoMapSharp
     public class OctoMapCompact
     {
         /// <summary>
+        /// The number of occupied voxels within the octomap.
+        /// </summary>
+        public uint OccupiedVoxelCount { get; set; }
+
+        /// <summary>
         /// The origin position of the OctoMap. Individual node positions are derived from this root position.
         /// </summary>
         public Vector3 RootNodePosition { get; set; }
@@ -51,13 +56,14 @@ namespace OctoMapSharp
         /// <summary>
         /// Constructor for the compact OctoMap. Sets the public properties of the class.
         /// </summary>
+        /// <param name="occupiedVoxelCount">The number of occupied voxels within the octomap</param>
         /// <param name="rootNodePosition">The position of the root node</param>
         /// <param name="rootNodeSize">The size of the root node</param>
         /// <param name="minimumNodeSize">The minimum node size within the octomap</param>
         /// <param name="bitStream">The compact bitstream</param>
-        public OctoMapCompact(Vector3 rootNodePosition, float rootNodeSize, float minimumNodeSize,
-            byte[] bitStream)
+        public OctoMapCompact(uint occupiedVoxelCount, Vector3 rootNodePosition, float rootNodeSize, float minimumNodeSize, byte[] bitStream)
         {
+            OccupiedVoxelCount = occupiedVoxelCount;
             RootNodePosition = rootNodePosition;
             RootNodeSize = rootNodeSize;
             MinimumNodeSize = minimumNodeSize;
@@ -74,7 +80,7 @@ namespace OctoMapSharp
         private struct OctoMapNode
         {
             /// <summary>
-            /// The ID of the dictionary entry in '_nodeChildren' which contains an array of indexes to this nodes children.
+            /// The index of the dictionary entry in '_nodeChildren' which contains an array of indexes to this nodes children.
             /// </summary>
             public uint? ChildArrayId { get; set; }
 
@@ -83,6 +89,16 @@ namespace OctoMapSharp
             /// </summary>
             public int Occupied { get; set; }
         }
+
+        /// <summary>
+        /// The number of occupied voxels within the octomap
+        /// </summary>
+        private uint _occupiedVoxelCount;
+
+        /// <summary>
+        /// Is true if the octomap has changed in some way since the last time 'HasChanged()' was called.
+        /// </summary>
+        private bool _hasChanged;
 
         /// <summary>
         /// The origin position of the OctoMap. Individual node positions are derived from this root position.
@@ -157,6 +173,7 @@ namespace OctoMapSharp
             _rootNodePosition = octoMapCompact.RootNodePosition;
             _rootNodeSize = octoMapCompact.RootNodeSize;
             _minimumNodeSize = octoMapCompact.MinimumNodeSize;
+            _occupiedVoxelCount = octoMapCompact.OccupiedVoxelCount;
 
             BitStream bitStream = new BitStream(octoMapCompact.BitStream);
 
@@ -181,7 +198,7 @@ namespace OctoMapSharp
 
             BitStream bitStream = new BitStream(new byte[streamLength]);
             ConvertToBitStreamRecursive(bitStream, _rootNodeId);
-            return new OctoMapCompact(_rootNodePosition, _rootNodeSize, _minimumNodeSize, bitStream.GetStreamData());
+            return new OctoMapCompact(_occupiedVoxelCount, _rootNodePosition, _rootNodeSize, _minimumNodeSize, bitStream.GetStreamData());
         }
 
         /// <summary>
@@ -365,6 +382,7 @@ namespace OctoMapSharp
                 if (bounds.Contains(point))
                 {
                     AddPointRecursive(ref point, _rootNodeSize, _rootNodePosition, _rootNodeId);
+                    _hasChanged = true;
                     return;
                 }
 
@@ -396,6 +414,11 @@ namespace OctoMapSharp
             // If we're at the deepest level possible, this current node becomes a leaf node.
             if (currentNodeSize < _minimumNodeSize)
             {
+                // If not already occupied increment the counter
+                if (!CheckNodeOccupied(_nodes[currentNodeId]))
+                {
+                    _occupiedVoxelCount++;
+                }
                 _nodes[currentNodeId] = IncreaseNodeOccupation(node);
                 return;
             }
@@ -458,6 +481,7 @@ namespace OctoMapSharp
                 {
                     uint childId = _nodeChildren[childArrayId.Value][i];
                     _nodes.Remove(childId);
+                    _occupiedVoxelCount--;
                 }
                 else
                 {
@@ -470,6 +494,7 @@ namespace OctoMapSharp
             {
                 // Remove the node children array
                 _nodeChildren.Remove(arrayId.Value);
+                _occupiedVoxelCount++;
             }
             else
             {
@@ -768,6 +793,30 @@ namespace OctoMapSharp
 
             Debug.Log("Failed to determine best fit child node centre.");
             return Vector3.zero;
+        }
+
+        #endregion
+
+        #region Public Accessors
+
+        /// <summary>
+        /// Returns the number of occupied voxels within the octomap.
+        /// </summary>
+        /// <returns>The number of voxels that are occupied within the octomap.</returns>
+        public uint GetOccupiedVoxelCount()
+        {
+            return _occupiedVoxelCount;
+        }
+
+        /// <summary>
+        /// Returns true if the octomap has changed in some way (one or more new points have been added) since the last time this function was called.
+        /// </summary>
+        /// <returns></returns>
+        public bool HasChanged()
+        {
+            bool hasChanged = _hasChanged;
+            _hasChanged = false;
+            return hasChanged;
         }
 
         #endregion
